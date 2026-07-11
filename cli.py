@@ -2,8 +2,10 @@ import argparse
 import os
 import sys
 import re
+import gzip
+import time
 from collections import Counter
-from reporter import print_report
+from reporter import print_report, export_to_json
 
 LOG_PATTERN = re.compile(
     r'^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>.*?)\] '
@@ -41,24 +43,27 @@ def analyze_log(file_path):
         'hourly_traffic': Counter()
     }
     
-    with open(file_path, 'r') as file:
-        for line in file:
-            parsed_data = parse_line(line)
-            
-            if parsed_data:
-                update_metrics(parsed_data, metrics)
-            else:
-                metrics['malformed_lines'] += 1
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    
+    try:
+        with open_func(file_path, 'rt', encoding='utf-8') as file:
+            for line in file:
+                parsed_data = parse_line(line)
                 
+                if parsed_data:
+                    update_metrics(parsed_data, metrics)
+                else:
+                    metrics['malformed_lines'] += 1
+    except FileNotFoundError:
+        print(f"Error: The log file was not found at '{file_path}'.")
+        sys.exit(1)
+                    
     return metrics
 
 def main():
     parser = argparse.ArgumentParser(description="A highly efficient CLI tool to analyze server access logs.")
-
     parser.add_argument("log_file", nargs="?", default="logs/access.log", help="Path to the log file (.log or .log.gz)")
-    
     parser.add_argument("-e", "--export", type=str, help="Export the final report to a JSON file (e.g., output.json)")
-    
     parser.add_argument("-t", "--top", type=int, default=10, help="Number of top endpoints to display (default: 10)")
     
     args = parser.parse_args()
@@ -69,12 +74,22 @@ def main():
         print("Please provide a valid path or ensure 'logs/access.log' exists.")
         sys.exit(1)
         
-    print(f"Successfully found the log file: {file_path}")
-    print("Starting analysis...\n")
+    print(f"[*] Successfully found the log file: {file_path}")
+    print("[*] Starting analysis...\n")
 
+    start_time = time.perf_counter()
+    
     final_metrics = analyze_log(file_path)
     
+    end_time = time.perf_counter()
+    execution_time = end_time - start_time
+    
     print_report(final_metrics)
+    
+    print(f"\n⏱️  Execution Time: {execution_time:.3f} seconds")
+    
+    if args.export:
+        export_to_json(final_metrics, args.export, args.top)
     
 if __name__ == "__main__":
     main()

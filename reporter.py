@@ -1,3 +1,22 @@
+import json
+
+def export_to_json(metrics, export_path, top_n=10):
+    export_data = {
+        "total_requests": metrics['total_requests'],
+        "unique_ips_count": len(metrics['unique_ips']),
+        "malformed_lines": metrics['malformed_lines'],
+        "top_endpoints": metrics['endpoints'].most_common(top_n),
+        "hourly_traffic": dict(metrics.get('hourly_traffic', {}))
+    }
+    
+    try:
+        with open(export_path, 'w') as f:
+            json.dump(export_data, f, indent=4)
+        print(f"💾 Report successfully exported to {export_path}")
+    except IOError as e:
+        print(f"❌ Error exporting to JSON: {e}")
+
+
 def print_report(metrics):
     total = metrics['total_requests']
     
