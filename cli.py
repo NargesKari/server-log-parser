@@ -3,58 +3,7 @@ import os
 import sys
 import re
 from collections import Counter
-
-def print_report(metrics):
-    total = metrics['total_requests']
-    
-    print("\n" + "="*55)
-    print(" 📊 SERVER LOG ANALYSIS REPORT")
-    print("="*55)
-    
-    if total == 0:
-        print(" ⚠️ No valid requests found in the log.")
-        print("="*55 + "\n")
-        return
-
-    unique_ips_count = len(metrics['unique_ips'])
-    malformed = metrics['malformed_lines']
-    
-    error_rate = (metrics['errors'] / total) * 100
-
-    print(f" 🔹 Total Requests:       {total:,}")
-    print(f" 🔹 Unique Client IPs:    {unique_ips_count:,}")
-    print(f" 🔹 Malformed Lines:      {malformed:,} (Skipped)")
-    print(f" 🔹 Error Rate (4xx/5xx): {error_rate:.2f}%\n")
-    
-    print("-" * 55)
-    print(" 🔥 TOP 10 REQUESTED ENDPOINTS")
-    print("-" * 55)
-    
-    top_endpoints = metrics['endpoints'].most_common(10)
-    
-    print(f"    {'Rank':<5} | {'Endpoint':<30} | {'Requests'}")
-    print("    " + "-"*47)
-    
-    for i, (endpoint, count) in enumerate(top_endpoints, 1):
-        display_endpoint = endpoint if len(endpoint) <= 28 else endpoint[:25] + "..."
-        print(f"    {i:<5} | {display_endpoint:<30} | {count:,}")
-
-    print("-" * 55)
-    print(" 🕒 HOURLY TRAFFIC DISTRIBUTION (Histogram)")
-    print("-" * 55)
-    
-    hourly_data = metrics['hourly_traffic']
-    if hourly_data:
-        max_traffic = max(hourly_data.values())
-        max_bar_length = 30
-        for hour in sorted(hourly_data.keys()):
-            count = hourly_data[hour]
-            bar_length = int((count / max_traffic) * max_bar_length) if max_traffic > 0 else 0
-            bar = "█" * bar_length
-            print(f"    {hour}:00 | {bar} {count:,}")
-            
-    print("="*55 + "\n")
-
+from reporter import print_report
 
 LOG_PATTERN = re.compile(
     r'^(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>.*?)\] '
@@ -104,16 +53,13 @@ def analyze_log(file_path):
     return metrics
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="A CLI tool to analyze server access logs and generate traffic metrics."
-    )
+    parser = argparse.ArgumentParser(description="A highly efficient CLI tool to analyze server access logs.")
+
+    parser.add_argument("log_file", nargs="?", default="logs/access.log", help="Path to the log file (.log or .log.gz)")
     
-    parser.add_argument(
-        "log_file",
-        nargs="?",
-        default=os.path.join("logs", "access.log"),
-        help="Path to the access log file (default: logs/access.log)"
-    )
+    parser.add_argument("-e", "--export", type=str, help="Export the final report to a JSON file (e.g., output.json)")
+    
+    parser.add_argument("-t", "--top", type=int, default=10, help="Number of top endpoints to display (default: 10)")
     
     args = parser.parse_args()
     file_path = args.log_file
