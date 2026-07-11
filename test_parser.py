@@ -1,7 +1,10 @@
+import os
+import json
 import random
 import string
 from collections import Counter
 from analyzer import parse_line, update_metrics
+from reporter import export_to_json
 
 class LoggerTestRunner:
     def __init__(self):
@@ -80,27 +83,22 @@ def main():
     # PHASE 2: 5 Edge Cases
     # ---------------------------------------------------------
     
-    # Edge Case 1: Completely malformed random garbage string
     garbage_string = "".join(random.choices(string.ascii_letters + string.digits, k=60))
     runner.assert_equal("Edge Case 1 (Completely malformed garbage string)", None, parse_line(garbage_string))
     
-    # Edge Case 2: Incomplete line (missing HTTP status and response size)
     incomplete_line = f'{generate_random_ip()} - - [01/Jun/2026:12:00:00 +0000] "GET / HTTP/1.1"'
     runner.assert_equal("Edge Case 2 (Incomplete line missing status/size)", None, parse_line(incomplete_line))
     
-    # Edge Case 3: IPv6 Address parsing
     ipv6_address = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
     ipv6_line = f'{ipv6_address} - - [01/Jun/2026:15:30:00 +0000] "GET /home HTTP/1.1" 200 1024 "-" "-"'
     actual_ipv6_parsed = parse_line(ipv6_line)
     runner.assert_equal("Edge Case 3 (Valid IPv6 Address format)", ipv6_address, actual_ipv6_parsed['ip'] if actual_ipv6_parsed else None)
     
-    # Edge Case 4: Extremely complex endpoint with query strings and special characters
     complex_endpoint = "/api/search?query=python&sort=desc&limit=100&token=" + "".join(random.choices(string.ascii_letters, k=15))
     complex_line = f'{generate_random_ip()} - - [01/Jun/2026:16:45:00 +0000] "GET {complex_endpoint} HTTP/1.1" 200 4096 "-" "-"'
     actual_complex_parsed = parse_line(complex_line)
     runner.assert_equal("Edge Case 4 (Complex Query Params in Endpoint)", complex_endpoint, actual_complex_parsed['endpoint'] if actual_complex_parsed else None)
     
-    # Edge Case 5: Missing quotes around the request line (Method, Endpoint, Protocol)
     no_quotes_line = f'{generate_random_ip()} - - [01/Jun/2026:17:00:00 +0000] GET /index HTTP/1.1 200 500 "-" "-"'
     runner.assert_equal("Edge Case 5 (Missing quotes in request line)", None, parse_line(no_quotes_line))
 
@@ -109,7 +107,6 @@ def main():
     # ---------------------------------------------------------
     metrics = get_blank_metrics()
     
-    # Test Brute-Force Threshold Calculation
     brute_ip = generate_random_ip()
     target_hour = f"{random.randint(0, 23):02d}"
     
@@ -131,7 +128,6 @@ def main():
         metrics['suspicious_ips'][brute_ip]
     )
     
-    # Test 5xx Server Error Hourly Spike Calculation
     spike_hour = "22"
     for _ in range(4):
         data = {
@@ -150,6 +146,36 @@ def main():
         4, 
         metrics['hourly_5xx_errors'][spike_hour]
     )
+
+    # ---------------------------------------------------------
+    # PHASE 4: JSON Export Integration Test
+    # ---------------------------------------------------------
+    test_export_path = "test_temp_output.json"
+    export_to_json(metrics, test_export_path, top_n=5)
+
+    file_created = os.path.exists(test_export_path)
+    runner.assert_equal("JSON Export (File Creation)", True, file_created)
+    
+    if file_created:
+        try:
+            with open(test_export_path, 'r') as f:
+                exported_data = json.load(f)
+                
+            runner.assert_equal(
+                "JSON Export (Data Integrity - Total Requests)", 
+                metrics['total_requests'], 
+                exported_data['total_requests']
+            )
+            
+            runner.assert_equal(
+                "JSON Export (Data Integrity - Suspicious IPs)", 
+                metrics['suspicious_ips'][brute_ip], 
+                exported_data['suspicious_ips'][brute_ip]
+            )
+            
+        finally:
+            # Cleanup: Always remove the temporary test file
+            os.remove(test_export_path)
 
     # Finally, print the tally
     runner.print_summary()
