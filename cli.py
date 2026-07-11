@@ -38,7 +38,21 @@ def print_report(metrics):
     for i, (endpoint, count) in enumerate(top_endpoints, 1):
         display_endpoint = endpoint if len(endpoint) <= 28 else endpoint[:25] + "..."
         print(f"    {i:<5} | {display_endpoint:<30} | {count:,}")
-        
+
+    print("-" * 55)
+    print(" 🕒 HOURLY TRAFFIC DISTRIBUTION (Histogram)")
+    print("-" * 55)
+    
+    hourly_data = metrics['hourly_traffic']
+    if hourly_data:
+        max_traffic = max(hourly_data.values())
+        max_bar_length = 30
+        for hour in sorted(hourly_data.keys()):
+            count = hourly_data[hour]
+            bar_length = int((count / max_traffic) * max_bar_length) if max_traffic > 0 else 0
+            bar = "█" * bar_length
+            print(f"    {hour}:00 | {bar} {count:,}")
+            
     print("="*55 + "\n")
 
 
@@ -64,6 +78,9 @@ def update_metrics(parsed_data, metrics):
     if status >= 400:
         metrics['errors'] += 1
 
+    hour = parsed_data['timestamp'].split(':')[1] 
+    metrics['hourly_traffic'][hour] += 1
+
 def analyze_log(file_path):
     metrics = {
         'total_requests': 0,
@@ -71,7 +88,8 @@ def analyze_log(file_path):
         'errors': 0,
         'unique_ips': set(),
         'endpoints': Counter(),
-        'statuses': Counter()
+        'statuses': Counter(),
+        'hourly_traffic': Counter()
     }
     
     with open(file_path, 'r') as file:
