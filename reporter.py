@@ -1,5 +1,7 @@
 import json
 
+from sklearn import metrics
+
 def export_to_json(metrics, export_path, top_n=10):
     export_data = {
         "total_requests": metrics['total_requests'],
@@ -68,7 +70,18 @@ def print_report(metrics, execution_time=None, top_n=10):
             bar = "▇" * bar_length
             print(f"    {hour}:00 | {bar} {count:,}")
             
+    suspicious_ips = metrics.get('suspicious_ips', {})
+    brute_force_suspects = {ip: count for ip, count in suspicious_ips.items() if count >= 5}
+    
+    if brute_force_suspects:
+        print("\n" + "-" * 55)
+        print(" 🚨 SUSPICIOUS ACTIVITY DETECTED (Brute-Force)")
+        print("-" * 55)
+        
+        for ip, count in sorted(brute_force_suspects.items(), key=lambda item: item[1], reverse=True):
+            print(f"    ⚠️  {ip:<15} | {count} failed login attempts (401)")
 
+            
     if execution_time is not None:
         print("-" * 55)
         print(f"⏱️  Execution Time: {execution_time:.3f} seconds")
