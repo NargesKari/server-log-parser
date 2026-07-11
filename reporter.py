@@ -17,7 +17,7 @@ def export_to_json(metrics, export_path, top_n=10):
         print(f"❌ Error exporting to JSON: {e}")
 
 
-def print_report(metrics):
+def print_report(metrics, execution_time=None, top_n=10):
     total = metrics['total_requests']
     
     print("\n" + "="*55)
@@ -43,7 +43,7 @@ def print_report(metrics):
     print(" 🔥 TOP 10 REQUESTED ENDPOINTS")
     print("-" * 55)
     
-    top_endpoints = metrics['endpoints'].most_common(10)
+    top_endpoints = metrics['endpoints'].most_common(top_n)
     
     print(f"    {'Rank':<5} | {'Endpoint':<30} | {'Requests'}")
     print("    " + "-"*47)
@@ -68,4 +68,8 @@ def print_report(metrics):
             bar = "▇" * bar_length
             print(f"    {hour}:00 | {bar} {count:,}")
             
+
+    if execution_time is not None:
+        print("-" * 55)
+        print(f"⏱️  Execution Time: {execution_time:.3f} seconds")
     print("="*55 + "\n")
