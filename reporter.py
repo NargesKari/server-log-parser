@@ -1,14 +1,14 @@
 import json
 
-from sklearn import metrics
-
 def export_to_json(metrics, export_path, top_n=10):
     export_data = {
         "total_requests": metrics['total_requests'],
         "unique_ips_count": len(metrics['unique_ips']),
         "malformed_lines": metrics['malformed_lines'],
         "top_endpoints": metrics['endpoints'].most_common(top_n),
-        "hourly_traffic": dict(metrics.get('hourly_traffic', {}))
+        "hourly_traffic": dict(metrics.get('hourly_traffic', {})),
+        "suspicious_ips": dict(metrics.get('suspicious_ips', {})),
+        "hourly_5xx_errors": dict(metrics.get('hourly_5xx_errors', {}))
     }
     
     try:
@@ -81,7 +81,25 @@ def print_report(metrics, execution_time=None, top_n=10):
         for ip, count in sorted(brute_force_suspects.items(), key=lambda item: item[1], reverse=True):
             print(f"    ⚠️  {ip:<15} | {count} failed login attempts (401)")
 
-            
+    hourly_traffic = metrics.get('hourly_traffic', {})
+    hourly_5xx = metrics.get('hourly_5xx_errors', {})
+    
+    spikes = []
+    for hour, total_in_hour in hourly_traffic.items():
+        errors_in_hour = hourly_5xx.get(hour, 0)
+        if total_in_hour > 0:
+            error_rate = (errors_in_hour / total_in_hour) * 100
+            if error_rate >= 5.0 and errors_in_hour >= 50:
+                spikes.append((hour, errors_in_hour, error_rate))
+                
+    if spikes:
+        print("\n" + "-" * 55)
+        print(" 📈 AUTOMATED ERROR SPIKE DETECTION (5xx)")
+        print("-" * 55)
+        for hour, errors, rate in sorted(spikes):
+            print(f"    🔥 {hour}:00 to {hour}:59 | {errors:,} errors | {rate:.1f}% failure rate")
+
+
     if execution_time is not None:
         print("-" * 55)
         print(f"⏱️  Execution Time: {execution_time:.3f} seconds")

@@ -35,6 +35,9 @@ def update_metrics(parsed_data, metrics):
 
     if parsed_data['endpoint'] == '/login' and status == 401:
         metrics['suspicious_ips'][parsed_data['ip']] += 1
+        
+    if 500 <= status < 600:
+        metrics['hourly_5xx_errors'][hour] += 1
 
 def analyze_log(file_path):
     metrics = {
@@ -45,7 +48,8 @@ def analyze_log(file_path):
         'endpoints': Counter(),
         'statuses': Counter(),
         'hourly_traffic': Counter(),
-        'suspicious_ips': Counter()
+        'suspicious_ips': Counter(),
+        'hourly_5xx_errors': Counter()
     }
     
     open_func = gzip.open if file_path.endswith('.gz') else open
